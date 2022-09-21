@@ -22,19 +22,23 @@ class GreetingPluginTest {
   @BeforeEach
   void setup() {
     settingsFile = new File(testProjectDir, "settings.gradle")
+    settingsFile << """
+      rootProject.name = 'hello-world'
+      include 'subproject'
+    """
+    new File("${testProjectDir}/subproject").mkdir()
+    new File("${testProjectDir}/subproject", "build.gradle").createNewFile()
     buildFile = new File(testProjectDir, "build.gradle")
   }
 
   @Test
   void testHelloWorldTask() throws IOException {
-    writeFile(settingsFile, "rootProject.name = 'hello-world'")
-    String buildFileContent = """
+    buildFile << """
         task helloWorld {
             doLast {
                 println 'Hello world!'
             }
         }"""
-    writeFile(buildFile, buildFileContent)
 
     BuildResult result = GradleRunner.create()
         .withProjectDir(testProjectDir)
@@ -47,8 +51,7 @@ class GreetingPluginTest {
 
   @Test
   void testJacocoPlugin() throws IOException {
-    writeFile(settingsFile, "rootProject.name = 'hello-world'")
-    String buildFileContent = """
+    buildFile << """
         plugins {
           id 'java'
           id 'jacoco'
@@ -61,7 +64,6 @@ class GreetingPluginTest {
             dependsOn test
         }        
         """
-    writeFile(buildFile, buildFileContent)
 
     BuildResult result = GradleRunner.create()
         .withProjectDir(testProjectDir)
@@ -74,14 +76,12 @@ class GreetingPluginTest {
 
   @Test
   void shouldNotCreateJacocoTask() throws IOException {
-    writeFile(settingsFile, "rootProject.name = 'hello-world'")
-    String buildFileContent = """
+    buildFile << """
         plugins {
           id 'java'
           id 'jacoco'
         }   
         """
-    writeFile(buildFile, buildFileContent)
 
     BuildResult result = GradleRunner.create()
         .withProjectDir(testProjectDir)
@@ -93,8 +93,7 @@ class GreetingPluginTest {
 
   @Test
   void shouldRunHelloTask() throws IOException {
-    writeFile(settingsFile, "rootProject.name = 'hello-world'")
-    String buildFileContent = """
+    buildFile << """
         plugins {
           id 'pl.ljozwiak.greeting'
         }   
@@ -104,7 +103,6 @@ class GreetingPluginTest {
           greeter = 'Poland'
         }
         """
-    writeFile(buildFile, buildFileContent)
 
     BuildResult result = GradleRunner.create()
         .withProjectDir(testProjectDir)
@@ -116,8 +114,108 @@ class GreetingPluginTest {
     Assertions.assertEquals(SUCCESS, result.task(":hello").outcome)
   }
 
-  static private void writeFile(File destination, String content) throws IOException {
-    destination.write(content)
+  @Test
+  void shouldRunSubprojectTaskByDefault() throws IOException {
+    buildFile << """
+        plugins {
+          id 'pl.ljozwiak.greeting'
+        }   
+        
+        greeting {
+          message = 'Hello'
+          greeter = 'Poland'
+        }
+        """
+
+    BuildResult result = GradleRunner.create()
+        .withProjectDir(testProjectDir)
+        .withArguments("build")
+        .withPluginClasspath()
+        .build()
+
+    Assertions.assertTrue(result.output.contains(":jacocoTestReport"))
+  }
+
+  @Test
+  void shouldRunSubprojectTask() throws IOException {
+    buildFile << """
+        plugins {
+          id 'pl.ljozwiak.greeting'
+        }   
+        
+        greeting {
+          message = 'Hello'
+          greeter = 'Poland'
+        }
+        
+        subprojects {
+          sub {
+            jacoco = true
+          }
+        }
+        """
+
+    BuildResult result = GradleRunner.create()
+        .withProjectDir(testProjectDir)
+        .withArguments("build")
+        .withPluginClasspath()
+        .build()
+
+    Assertions.assertTrue(result.output.contains(":jacocoTestReport"))
+  }
+
+  @Test
+  void shouldNotRunSubprojectTask() throws IOException {
+    buildFile << """
+        plugins {
+          id 'pl.ljozwiak.greeting'
+        }   
+        
+        greeting {
+          message = 'Hello'
+          greeter = 'Poland'
+        }
+        
+        subprojects {
+          sub {
+            jacoco = false
+          }
+        }
+        """
+
+    BuildResult result = GradleRunner.create()
+        .withProjectDir(testProjectDir)
+        .withArguments("build")
+        .withPluginClasspath()
+        .build()
+
+    Assertions.assertFalse(result.output.contains(":jacocoTestReport"))
+  }
+
+  @Test
+  void shouldNotRunSubprojectTaskWhenConfiguredOnRootLevel() throws IOException {
+    buildFile << """
+        plugins {
+          id 'pl.ljozwiak.greeting'
+        }   
+        
+        greeting {
+          message = 'Hello'
+          greeter = 'Poland'
+        }
+         
+        sub {
+          jacoco = false
+        }
+        """
+
+    BuildResult result = GradleRunner.create()
+        .withProjectDir(testProjectDir)
+        .withArguments("build")
+        .withPluginClasspath()
+        .build()
+
+    Assertions.assertFalse(result.output.contains(":jacocoTestReport"))
   }
 
   @Test

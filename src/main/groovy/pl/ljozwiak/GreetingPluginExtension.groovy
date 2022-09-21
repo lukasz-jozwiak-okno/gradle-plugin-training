@@ -2,8 +2,8 @@ package pl.ljozwiak
 
 import org.gradle.api.provider.Property
 
-interface GreetingPluginExtension {
-  Property<String> getMessage()
+abstract class GreetingPluginExtension {
+  abstract Property<String> getMessage()
 
-  Property<String> getGreeter()
+  abstract Property<String> getGreeter()
 }
